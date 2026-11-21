@@ -1,0 +1,233 @@
+---
+import { getSounds } from "../lib/sounds";
+const sounds = await getSounds();
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sonidos</title>
+    <meta name="description" content="Biblioteca de sonidos cortos con link directo." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔊</text></svg>" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Sonidos</h1>
+        <p class="count">{sounds.length} archivos · <a href="/api/sounds.json">API</a></p>
+        <input
+          id="search"
+          type="search"
+          placeholder="Buscar sonido"
+          aria-label="Buscar sonido"
+          autocomplete="off"
+        />
+      </header>
+
+      <ul id="list">
+        {sounds.map((s) => (
+          <li data-name={s.name.toLowerCase()} data-src={s.path}>
+            <button class="play" aria-label={`Reproducir ${s.name}`}>
+              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+              <svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z" /></svg>
+            </button>
+            <span class="name">{s.name}</span>
+            <span class="fmt">{s.format}</span>
+            <button class="copy">Copiar link</button>
+          </li>
+        ))}
+      </ul>
+
+      <p id="empty" hidden>No hay sonidos que coincidan. Probá con otra palabra.</p>
+      {sounds.length === 0 && (
+        <p>Todavía no hay sonidos. Agregá archivos .mp3 o .wav en <code>public/sounds/</code>.</p>
+      )}
+    </main>
+
+    <script>
+      const list = document.getElementById("list") as HTMLUListElement;
+      const search = document.getElementById("search") as HTMLInputElement;
+      const empty = document.getElementById("empty") as HTMLElement;
+      const audio = new Audio();
+      let current: HTMLLIElement | null = null;
+
+      function reset() {
+        if (!current) return;
+        current.classList.remove("playing");
+        current.style.setProperty("--p", "0%");
+        current.querySelector(".play")?.setAttribute("aria-pressed", "false");
+        current = null;
+      }
+
+      function toggle(li: HTMLLIElement) {
+        if (current === li) {
+          audio.pause();
+          reset();
+          return;
+        }
+        reset();
+        current = li;
+        li.classList.add("playing");
+        li.querySelector(".play")?.setAttribute("aria-pressed", "true");
+        audio.src = li.dataset.src!;
+        audio.play().catch(reset);
+      }
+
+      audio.addEventListener("timeupdate", () => {
+        if (current && audio.duration) {
+          current.style.setProperty("--p", `${(audio.currentTime / audio.duration) * 100}%`);
+        }
+      });
+      audio.addEventListener("ended", reset);
+
+      list.addEventListener("click", async (e) => {
+        const target = e.target as HTMLElement;
+        const li = target.closest("li") as HTMLLIElement | null;
+        if (!li) return;
+
+        if (target.closest(".play")) toggle(li);
+
+        const copyBtn = target.closest(".copy") as HTMLButtonElement | null;
+        if (copyBtn) {
+          const url = new URL(li.dataset.src!, location.origin).href;
+          try {
+            await navigator.clipboard.writeText(url);
+            copyBtn.textContent = "Copiado";
+            copyBtn.classList.add("done");
+          } catch {
+            copyBtn.textContent = "No se pudo copiar";
+          }
+          setTimeout(() => {
+            copyBtn.textContent = "Copiar link";
+            copyBtn.classList.remove("done");
+          }, 1500);
+        }
+      });
+
+      search.addEventListener("input", () => {
+        const q = search.value.trim().toLowerCase();
+        let visible = 0;
+        list.querySelectorAll<HTMLLIElement>("li").forEach((li) => {
+          const match = li.dataset.name!.includes(q);
+          li.hidden = !match;
+          if (match) visible++;
+        });
+        empty.hidden = visible > 0;
+      });
+    </script>
+
+    <style is:global>
+      :root {
+        --bg: #f2f5f4;
+        --surface: #ffffff;
+        --ink: #1b2826;
+        --muted: #667571;
+        --line: #dce3e1;
+        --accent: #2457ff;
+        --accent-soft: #dfe7ff;
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141a19;
+          --surface: #1c2423;
+          --ink: #e8efed;
+          --muted: #93a39f;
+          --line: #2b3634;
+          --accent: #7b9cff;
+          --accent-soft: #26335f;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.5;
+      }
+      main { max-width: 640px; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+
+      header { margin-bottom: 1.5rem; }
+      h1 { margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+      .count { margin: 0.25rem 0 1.25rem; color: var(--muted); font-size: 0.9rem; }
+      .count a { color: inherit; }
+
+      #search {
+        width: 100%;
+        padding: 0.7rem 1rem;
+        font: inherit;
+        color: var(--ink);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+
+      li {
+        --p: 0%;
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        padding: 0.6rem 0.75rem;
+        background:
+          linear-gradient(90deg, var(--accent-soft) var(--p), transparent var(--p)),
+          var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      li[hidden] { display: none; }
+      li.playing { border-color: var(--accent); }
+
+      .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .fmt { color: var(--muted); font-size: 0.8rem; }
+
+      button { font: inherit; cursor: pointer; }
+      .play {
+        flex: none;
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: var(--accent);
+        border: 0;
+        border-radius: 50%;
+      }
+      @media (prefers-color-scheme: dark) { .play { color: #0f1530; } }
+      .play svg { width: 18px; height: 18px; fill: currentColor; }
+      .i-stop { display: none; }
+      li.playing .i-play { display: none; }
+      li.playing .i-stop { display: block; }
+
+      .copy {
+        flex: none;
+        padding: 0.4rem 0.8rem;
+        color: var(--ink);
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 0.85rem;
+        min-width: 7.5rem;
+      }
+      .copy:hover { border-color: var(--accent); }
+      .copy.done { color: var(--accent); border-color: var(--accent); }
+
+      button:focus-visible, #search:focus-visible, a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      #empty { color: var(--muted); text-align: center; margin-top: 2rem; }
+
+      @media (max-width: 480px) {
+        .fmt { display: none; }
+        .copy { min-width: 0; }
+      }
+    </style>
+  </body>
+</html>
