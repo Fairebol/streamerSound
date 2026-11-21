@@ -18,3 +18,5 @@ npm run build    # genera /dist
 ## Endpoints
 - `GET /api/sounds.json` → lista con `id`, `name`, `format`, `url`
 - `GET /sounds/<archivo>` → link directo al audio
+
+### [WebLink](https://streamersound.vercel.app/)
